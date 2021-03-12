@@ -8,6 +8,7 @@ import random
 import cv2
 import os.path as osp
 import numpy as np
+from easydict import EasyDict
 
 from utils import plot_bbox
 
@@ -127,10 +128,66 @@ class ScoreDetectionDataset(Dataset):
         }
 
     def __len__(self):
-        return len(self.data)        
+        return len(self.data)  
+
+class ScoreServeDataset(Dataset):
+    def __init__(self, path_json, path_frames):
+        self.path_frames = path_frames
+        self.transform = T.Compose([T.ToTensor(), T.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.255])])
+
+        with open(path_json, 'r') as f:
+            self.data = json.load(f)   
+
+        # '-1' means that data is not available, in coherence with the annotated data in 'frames.json'
+        self.points_to_index = {-1: 0, 0: 1, 15: 2, 30: 3, 40: 4, 'adv': 5}
+        self.sets_to_index = {-1:0, 0:1, 1:2, 2:3, 3:4, 4:5, 5:6}
+        self.matches_to_index = {-1: 0, 0: 1, 1: 2, 2: 3, 3: 4, 4: 5, 5: 6, 6: 7, 7: 8}
+        self.serve_to_index = {False: 0, True: 1}
+
+        self.samples = []
+        for data in self.data:
+            img = cv2.imread(osp.join(self.path_frames, data['id'] + '.png'))
+            x0, y0, w, h = data['bbox']
+            x1, y1 = x0+w, y0+h
+            img = img[y0 : y1, x0 : x1]
+
+            mid_y = h//2
+
+            sample = EasyDict()
+            sample.img = cv2.resize(img[0:mid_y], (210, 30))
+            sample.points = self.points_to_index[data['p1_points']]
+            sample.sets = self.sets_to_index[data['p1_sets']]
+            sample.matches = self.matches_to_index[data['p1_matches']]
+            sample.serve = self.serve_to_index[data['p1_serves']]
+            self.samples.append(sample)
+
+            sample = EasyDict()
+            sample.img = cv2.resize(img[mid_y:], (210, 30))
+            sample.points = self.points_to_index[data['p2_points']]
+            sample.sets = self.sets_to_index[data['p2_sets']]
+            sample.matches = self.matches_to_index[data['p2_matches']]
+            sample.serve = self.serve_to_index[data['p2_serves']]
+            self.samples.append(sample)        
+
+    def __getitem__(self, idx):
+        sample = self.samples[idx]
+
+        img_transformed = self.transform(sample.img)
+
+        return {
+            'images': img_transformed,
+            'np_images': sample.img,
+            'points': sample.points,
+            'sets': sample.sets,
+            'matches': sample.matches,
+            'serves': sample.serve
+        }
+
+    def __len__(self):
+        return len(self.samples)                  
 
 if __name__ == "__main__":
-    dataset = ScoreBoxCropDataset('./data/frames.json', './data/frames')
+    dataset = ScoreServeDataset('./data/frames.json', './data/frames')
     dataloader = DataLoader(dataset, batch_size=2, num_workers=1)
-    data = dataset[18]
+    data = dataset[0]
     batch = next(iter(dataloader))
