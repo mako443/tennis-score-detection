@@ -98,6 +98,37 @@ class ScoreBoxCropDataset(Dataset):
     def __len__(self):
         return len(self.data)
 
+class ScoreDetectionDataset(Dataset):
+    def __init__(self, path_json, path_frames):
+        self.path_frames = path_frames
+        self.transform = T.Compose([T.ToTensor(), T.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.255])])
+
+        with open(path_json, 'r') as f:
+            self.data = json.load(f)
+
+    def __getitem__(self, idx):
+        data = self.data[idx]
+        img = Image.open(osp.join(self.path_frames, data['id'] + '.png'))
+        bbox = data['bbox'] #Convert to [x0, y0, x1, x1]
+        bbox[2] += bbox[0]
+        bbox[3] += bbox[1]
+
+        x0, y0, x1, y1 = bbox
+        x0 -= 5
+        y0 -= 5
+        x1 += 5
+        y1 += 5
+        img = img.crop((x0, y0, x1, y1))                    
+
+        return {
+            'np_images': np.asarray(img).copy(),
+            'images': self.transform(img),
+            'data': data
+        }
+
+    def __len__(self):
+        return len(self.data)        
+
 if __name__ == "__main__":
     dataset = ScoreBoxCropDataset('./data/frames.json', './data/frames')
     dataloader = DataLoader(dataset, batch_size=2, num_workers=1)
