@@ -7,6 +7,7 @@ import torchvision.models
 
 import numpy as np
 import cv2
+import time
 from utils import calc_iou, plot_boxes, plot_metrics
 
 from dataloading.dataset import ScoreBoxCropDataset
@@ -88,11 +89,9 @@ def train_epoch(model, dataloader, max_batches=99):
 
 @torch.no_grad()
 def val_epoch(model, dataloader):
-    model.train()
+    model.eval()
     epoch_accs = []
     for i_batch, batch in enumerate(dataloader):
-
-        optimizer.zero_grad()
         predictions = model(batch['images'].to(device))
         predictions = predictions.cpu().detach().numpy() * np.array((W,H,W,H))
         targets = batch['boxes'].cpu().detach().numpy()
@@ -124,7 +123,14 @@ if __name__ == "__main__":
         criterion = nn.MSELoss()        
         for epoch in range(32):
             loss = train_epoch(model, dataloader, max_batches=99)
+
+            t0 = time.time()
             acc = val_epoch(model, dataloader)
+            t1 = time.time()
+            print(f'Time: {4 * (t1-t0) / len(dataset)}')
+            quit()
+
+
             print(f'\r epoch {epoch:03.0f} loss {loss:0.5f} acc {acc:0.2f}', end='')
             dict_loss[lr].append(loss)
             dict_acc[lr].append(acc)

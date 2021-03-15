@@ -134,6 +134,7 @@ class ScoreServeDataset(Dataset):
     def __init__(self, path_json, path_frames):
         self.path_frames = path_frames
         self.transform = T.Compose([T.ToTensor(), T.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.255])])
+        self.resize_dim = (210, 30)
 
         with open(path_json, 'r') as f:
             self.data = json.load(f)   
@@ -154,7 +155,7 @@ class ScoreServeDataset(Dataset):
             mid_y = h//2
 
             sample = EasyDict()
-            sample.img = cv2.resize(img[0:mid_y], (210, 30))
+            sample.img = cv2.resize(img[0:mid_y], self.resize_dim)
             sample.points = self.points_to_index[data['p1_points']]
             sample.sets = self.sets_to_index[data['p1_sets']]
             sample.matches = self.matches_to_index[data['p1_matches']]
@@ -162,7 +163,7 @@ class ScoreServeDataset(Dataset):
             self.samples.append(sample)
 
             sample = EasyDict()
-            sample.img = cv2.resize(img[mid_y:], (210, 30))
+            sample.img = cv2.resize(img[mid_y:], self.resize_dim)
             sample.points = self.points_to_index[data['p2_points']]
             sample.sets = self.sets_to_index[data['p2_sets']]
             sample.matches = self.matches_to_index[data['p2_matches']]
